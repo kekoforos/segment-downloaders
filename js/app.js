@@ -10,6 +10,7 @@
   var formMessageEl = document.getElementById('form-message');
   var listMessageEl = document.getElementById('list-message');
   var downloadAllBtn = document.getElementById('download-all-btn');
+  var removeAllBtn = document.getElementById('remove-all-btn');
   var segmentFileInput = document.getElementById('segment-file-input');
   var importMessageEl = document.getElementById('import-message');
 
@@ -173,6 +174,23 @@
     render();
   }
 
+  function removeAllSegments() {
+    if (segments.length === 0) {
+      setMessage(listMessageEl, 'El listado ya está vacío.', 'error');
+      return;
+    }
+
+    var confirmed = window.confirm('¿Seguro que quieres eliminar los ' + segments.length + ' segmento(s) del listado?');
+    if (!confirmed) {
+      return;
+    }
+
+    segments = [];
+    saveSegments();
+    render();
+    setMessage(listMessageEl, 'Se ha vaciado el listado de segmentos.', 'success');
+  }
+
   function parseSegmentIdsFromText(text) {
     return text
       .split(/\r\n|\r|\n/)
@@ -243,21 +261,34 @@
     window.URL.revokeObjectURL(url);
   }
 
-  function showSegmentError(li, message) {
+  function showSegmentMessage(li, message, type) {
     if (!li) {
       return;
     }
-    var existing = li.querySelector('.segment-error');
+    var existing = li.querySelector('.segment-note');
     if (existing) {
       existing.remove();
     }
     if (!message) {
       return;
     }
-    var errorEl = document.createElement('span');
-    errorEl.className = 'segment-error';
-    errorEl.textContent = message;
-    li.appendChild(errorEl);
+    var noteEl = document.createElement('span');
+    noteEl.className = 'segment-note ' + (type || 'error');
+    noteEl.textContent = message;
+    li.appendChild(noteEl);
+  }
+
+  function triggerDirectDownload(segmentId) {
+    // Descarga vía iframe oculto: evita el fetch (y por tanto CORS) dejando que el navegador gestione la petición.
+    var iframe = document.createElement('iframe');
+    iframe.style.display = 'none';
+    iframe.src = buildGpxUrl(segmentId);
+    document.body.appendChild(iframe);
+    window.setTimeout(function () {
+      if (iframe.parentNode) {
+        iframe.parentNode.removeChild(iframe);
+      }
+    }, 15000);
   }
 
   function extractSegmentName(response, segmentId) {
@@ -268,7 +299,7 @@
   }
 
   function downloadSegment(segmentId, li) {
-    showSegmentError(li, '');
+    showSegmentMessage(li, '');
 
     return fetch(buildGpxUrl(segmentId))
       .then(function (response) {
@@ -291,7 +322,18 @@
         return { segmentId: segmentId, ok: true };
       })
       .catch(function (err) {
-        showSegmentError(li, 'No se pudo descargar el segmento "' + segmentId + '": ' + err.message);
+        // "Failed to fetch" (TypeError) suele indicar un bloqueo CORS del dominio donde está alojada la app;
+        // en ese caso se recurre a una descarga directa, que no depende de CORS pero no permite renombrar el archivo.
+        if (err instanceof TypeError) {
+          triggerDirectDownload(segmentId);
+          showSegmentMessage(
+            li,
+            'Descarga iniciada en modo compatibilidad: el archivo puede conservar el nombre original de doogal.co.uk.',
+            'info'
+          );
+          return { segmentId: segmentId, ok: true, fallback: true };
+        }
+        showSegmentMessage(li, 'No se pudo descargar el segmento "' + segmentId + '": ' + err.message, 'error');
         return { segmentId: segmentId, ok: false, error: err };
       });
   }
@@ -324,6 +366,7 @@
   });
 
   downloadAllBtn.addEventListener('click', downloadAllSegments);
+  removeAllBtn.addEventListener('click', removeAllSegments);
 
   segmentFileInput.addEventListener('change', function () {
     var file = segmentFileInput.files && segmentFileInput.files[0];
