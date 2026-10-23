@@ -260,6 +260,16 @@ button:hover {
   min-width: 0;
 }
 
+.segment-item .segment-position {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 1.4em;
+  text-align: right;
+}
+
 .segment-item .segment-badge {
   flex-shrink: 0;
   display: inline-flex;
@@ -271,6 +281,13 @@ button:hover {
   font-weight: 800;
   font-size: 0.8rem;
   font-variant-numeric: tabular-nums;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.segment-item .segment-badge:hover {
+  background: rgba(252, 76, 2, 0.2);
+  text-decoration: underline;
 }
 
 .segment-item .segment-label {

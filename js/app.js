@@ -3,6 +3,7 @@
 
   var STORAGE_KEY = 'stravaSegmentDownloader.segments';
   var GPX_BASE_URL = 'https://www.doogal.co.uk/StravaSegmentGpx/';
+  var STRAVA_SEGMENT_URL = 'https://www.strava.com/segments/';
 
   var segmentListEl = document.getElementById('segment-list');
   var addForm = document.getElementById('add-segment-form');
@@ -60,7 +61,7 @@
   function render() {
     segmentListEl.innerHTML = '';
 
-    segments.forEach(function (segment) {
+    segments.forEach(function (segment, index) {
       var segmentId = segment.id;
       var li = document.createElement('li');
       li.className = 'segment-item';
@@ -69,9 +70,18 @@
       var info = document.createElement('div');
       info.className = 'segment-info';
 
-      var badge = document.createElement('span');
+      var position = document.createElement('span');
+      position.className = 'segment-position';
+      position.textContent = (index + 1) + '.';
+      info.appendChild(position);
+
+      var badge = document.createElement('a');
       badge.className = 'segment-badge';
       badge.textContent = segmentId;
+      badge.href = STRAVA_SEGMENT_URL + encodeURIComponent(segmentId);
+      badge.target = '_blank';
+      badge.rel = 'noopener noreferrer';
+      badge.title = 'Ver segmento en Strava';
       info.appendChild(badge);
 
       var label = document.createElement('span');
