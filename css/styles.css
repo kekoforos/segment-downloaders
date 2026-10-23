@@ -290,6 +290,13 @@ button:hover {
   text-decoration: underline;
 }
 
+.segment-item .segment-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 0.1rem;
+}
+
 .segment-item .segment-label {
   display: block;
   min-width: 0;
@@ -299,6 +306,41 @@ button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.segment-item .segment-description {
+  display: block;
+  min-width: 0;
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.segment-item .segment-description.segment-description-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-style: italic;
+}
+
+.segment-item .segment-description.segment-description-loading::before {
+  content: '';
+  flex-shrink: 0;
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--strava-orange);
+  animation: segment-description-spin 0.6s linear infinite;
+}
+
+@keyframes segment-description-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .segment-item .segment-actions {

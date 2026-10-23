@@ -16,6 +16,19 @@
   var importMessageEl = document.getElementById('import-message');
 
   var segments = loadSegments();
+  var loadingSegmentIds = {};
+
+  function isSegmentLoading(segmentId) {
+    return !!loadingSegmentIds[segmentId];
+  }
+
+  function setSegmentLoading(segmentId, isLoading) {
+    if (isLoading) {
+      loadingSegmentIds[segmentId] = true;
+    } else {
+      delete loadingSegmentIds[segmentId];
+    }
+  }
 
   function loadSegments() {
     try {
@@ -24,9 +37,18 @@
       if (!Array.isArray(parsed)) {
         return [];
       }
-      // Migra listados antiguos (array de strings) al formato {id, name}.
+      // Migra listados antiguos (array de strings, o {id, name} sin datos descriptivos) al formato actual.
       return parsed.map(function (item) {
-        return typeof item === 'string' ? { id: item, name: null } : { id: item.id, name: item.name || null };
+        if (typeof item === 'string') {
+          return { id: item, name: null, distance: null, elevationGain: null, averageGrade: null };
+        }
+        return {
+          id: item.id,
+          name: item.name || null,
+          distance: typeof item.distance === 'number' ? item.distance : null,
+          elevationGain: typeof item.elevationGain === 'number' ? item.elevationGain : null,
+          averageGrade: typeof item.averageGrade === 'number' ? item.averageGrade : null
+        };
       });
     } catch (err) {
       return [];
@@ -58,6 +80,101 @@
     return null;
   }
 
+  function toRadians(degrees) {
+    return (degrees * Math.PI) / 180;
+  }
+
+  function haversineDistanceMeters(a, b) {
+    var earthRadiusMeters = 6371000;
+    var lat1 = toRadians(a.lat);
+    var lat2 = toRadians(b.lat);
+    var deltaLat = toRadians(b.lat - a.lat);
+    var deltaLon = toRadians(b.lon - a.lon);
+    var sinDLat = Math.sin(deltaLat / 2);
+    var sinDLon = Math.sin(deltaLon / 2);
+    var h = sinDLat * sinDLat + Math.cos(lat1) * Math.cos(lat2) * sinDLon * sinDLon;
+    var c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+    return earthRadiusMeters * c;
+  }
+
+  function parseGpxDescriptiveData(xmlText) {
+    var parser = new DOMParser();
+    var xml = parser.parseFromString(xmlText, 'application/xml');
+    if (xml.querySelector('parsererror')) {
+      return null;
+    }
+
+    var trkpts = xml.getElementsByTagName('trkpt');
+    if (!trkpts || trkpts.length < 2) {
+      return null;
+    }
+
+    var points = [];
+    for (var i = 0; i < trkpts.length; i += 1) {
+      var trkpt = trkpts[i];
+      var lat = parseFloat(trkpt.getAttribute('lat'));
+      var lon = parseFloat(trkpt.getAttribute('lon'));
+      var eleEl = trkpt.getElementsByTagName('ele')[0];
+      var ele = eleEl ? parseFloat(eleEl.textContent) : NaN;
+      if (!isFinite(lat) || !isFinite(lon) || !isFinite(ele)) {
+        // Sin elevación en algún punto no se puede calcular desnivel/pendiente de forma fiable.
+        return null;
+      }
+      points.push({ lat: lat, lon: lon, ele: ele });
+    }
+
+    var distanceMeters = 0;
+    var elevationGainMeters = 0;
+    for (var j = 1; j < points.length; j += 1) {
+      distanceMeters += haversineDistanceMeters(points[j - 1], points[j]);
+      var eleDiff = points[j].ele - points[j - 1].ele;
+      if (eleDiff > 0) {
+        elevationGainMeters += eleDiff;
+      }
+    }
+
+    if (distanceMeters <= 0) {
+      return null;
+    }
+
+    var averageGrade = Math.round((elevationGainMeters / distanceMeters) * 1000) / 10;
+
+    return {
+      distance: Math.round(distanceMeters),
+      elevationGain: Math.round(elevationGainMeters),
+      averageGrade: averageGrade
+    };
+  }
+
+  function buildSegmentDescriptionText(segment) {
+    if (
+      !segment ||
+      typeof segment.distance !== 'number' ||
+      typeof segment.elevationGain !== 'number' ||
+      typeof segment.averageGrade !== 'number'
+    ) {
+      return null;
+    }
+    var distanceKm = (segment.distance / 1000).toFixed(1);
+    return distanceKm + ' km · ' + segment.elevationGain + ' m D+ · ' + segment.averageGrade.toFixed(1) + '% pendiente media';
+  }
+
+  function getSegmentDescriptionDisplay(segmentId, segment) {
+    var text = buildSegmentDescriptionText(segment);
+    if (text) {
+      return { text: text, loading: false };
+    }
+    if (isSegmentLoading(segmentId)) {
+      return { text: 'Cargando datos…', loading: true };
+    }
+    return null;
+  }
+
+  function applyDescriptionDisplay(descriptionEl, display) {
+    descriptionEl.textContent = display.text;
+    descriptionEl.classList.toggle('segment-description-loading', display.loading);
+  }
+
   function render() {
     segmentListEl.innerHTML = '';
 
@@ -84,13 +201,26 @@
       badge.title = 'Ver segmento en Strava';
       info.appendChild(badge);
 
+      var textWrap = document.createElement('div');
+      textWrap.className = 'segment-text';
+
       var label = document.createElement('span');
       label.className = 'segment-label';
       label.textContent = segment.name || '';
       if (segment.name) {
         label.title = segment.name;
       }
-      info.appendChild(label);
+      textWrap.appendChild(label);
+
+      var descriptionDisplay = getSegmentDescriptionDisplay(segmentId, segment);
+      if (descriptionDisplay) {
+        var description = document.createElement('span');
+        description.className = 'segment-description';
+        applyDescriptionDisplay(description, descriptionDisplay);
+        textWrap.appendChild(description);
+      }
+
+      info.appendChild(textWrap);
 
       li.appendChild(info);
 
@@ -132,27 +262,74 @@
         label.title = segment.name;
       }
     }
+
+    var textWrap = li.querySelector('.segment-text');
+    var existingDescription = li.querySelector('.segment-description');
+    var descriptionDisplay = getSegmentDescriptionDisplay(segmentId, segment);
+    if (descriptionDisplay) {
+      if (existingDescription) {
+        applyDescriptionDisplay(existingDescription, descriptionDisplay);
+      } else if (textWrap) {
+        var description = document.createElement('span');
+        description.className = 'segment-description';
+        applyDescriptionDisplay(description, descriptionDisplay);
+        textWrap.appendChild(description);
+      }
+    } else if (existingDescription) {
+      existingDescription.remove();
+    }
   }
 
   function fetchSegmentName(segmentId) {
+    setSegmentLoading(segmentId, true);
+    updateSegmentLabel(segmentId);
+
     return fetch(buildGpxUrl(segmentId))
       .then(function (response) {
-        var name = response.ok ? extractSegmentName(response, segmentId) : null;
-        if (response.body && response.body.cancel) {
-          response.body.cancel();
+        if (!response.ok) {
+          if (response.body && response.body.cancel) {
+            response.body.cancel();
+          }
+          return null;
         }
-        return name;
+        var name = extractSegmentName(response, segmentId);
+        return response.text().then(function (text) {
+          var descriptiveData = null;
+          try {
+            descriptiveData = parseGpxDescriptiveData(text);
+          } catch (err) {
+            // Los datos descriptivos son informativos; si el parseo falla, se omiten.
+            descriptiveData = null;
+          }
+          return { name: name, descriptiveData: descriptiveData };
+        });
       })
-      .then(function (name) {
+      .then(function (result) {
         var segment = findSegment(segmentId);
-        if (segment && name) {
-          segment.name = name;
+        if (!segment || !result) {
+          return;
+        }
+        var changed = false;
+        if (result.name) {
+          segment.name = result.name;
+          changed = true;
+        }
+        if (result.descriptiveData) {
+          segment.distance = result.descriptiveData.distance;
+          segment.elevationGain = result.descriptiveData.elevationGain;
+          segment.averageGrade = result.descriptiveData.averageGrade;
+          changed = true;
+        }
+        if (changed) {
           saveSegments();
-          updateSegmentLabel(segmentId);
         }
       })
       .catch(function () {
-        // El nombre del segmento es informativo; si falla, se conserva solo el ID.
+        // El nombre y los datos descriptivos del segmento son informativos; si falla, se conserva solo el ID.
+      })
+      .finally(function () {
+        setSegmentLoading(segmentId, false);
+        updateSegmentLabel(segmentId);
       });
   }
 
@@ -169,7 +346,7 @@
       return;
     }
 
-    segments.push({ id: value, name: null });
+    segments.push({ id: value, name: null, distance: null, elevationGain: null, averageGrade: null });
     saveSegments();
     render();
     setMessage(formMessageEl, 'Segmento "' + value + '" añadido.', 'success');
@@ -229,7 +406,7 @@
         return;
       }
       seenInFile[line] = true;
-      var segment = { id: line, name: null };
+      var segment = { id: line, name: null, distance: null, elevationGain: null, averageGrade: null };
       segments.push(segment);
       added.push(segment);
     });
@@ -397,7 +574,7 @@
   render();
 
   segments.forEach(function (segment) {
-    if (!segment.name) {
+    if (!segment.name || typeof segment.distance !== 'number') {
       fetchSegmentName(segment.id);
     }
   });
