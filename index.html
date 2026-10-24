@@ -27,24 +27,67 @@
 
   <main>
     <section class="add-segment-section" aria-label="Añadir segmento">
-      <form id="add-segment-form">
-        <label for="segment-id-input">ID de segmento Strava</label>
-        <input
-          type="text"
-          id="segment-id-input"
-          name="segmentId"
-          placeholder="Ej. 675809"
-          autocomplete="off"
-        >
-        <button type="submit">Añadir</button>
-      </form>
-      <p id="form-message" class="message" role="alert" aria-live="polite"></p>
-
-      <div class="import-segments">
-        <label for="segment-file-input">Importar listado desde archivo .txt (un ID de segmento por línea)</label>
-        <input type="file" id="segment-file-input" accept=".txt,text/plain">
+      <div class="tabs" role="tablist" aria-label="Formas de añadir segmentos">
+        <button type="button" id="tab-manual" class="tab-btn is-active" role="tab" aria-selected="true" aria-controls="tabpanel-manual">
+          Añadir manualmente
+        </button>
+        <button type="button" id="tab-starred" class="tab-btn" role="tab" aria-selected="false" aria-controls="tabpanel-starred" tabindex="-1">
+          Importar desde Mis Segmentos de Strava
+        </button>
       </div>
-      <p id="import-message" class="message" role="alert" aria-live="polite"></p>
+
+      <div id="tabpanel-manual" class="tabpanel" role="tabpanel" aria-labelledby="tab-manual">
+        <form id="add-segment-form">
+          <label for="segment-id-input">ID de segmento Strava</label>
+          <input
+            type="text"
+            id="segment-id-input"
+            name="segmentId"
+            placeholder="Ej. 675809"
+            autocomplete="off"
+          >
+          <button type="submit">Añadir</button>
+        </form>
+        <p id="form-message" class="message" role="alert" aria-live="polite"></p>
+
+        <div class="import-segments">
+          <label for="segment-file-input">Importar listado desde archivo .txt (un ID de segmento por línea)</label>
+          <input type="file" id="segment-file-input" accept=".txt,text/plain">
+        </div>
+        <p id="import-message" class="message" role="alert" aria-live="polite"></p>
+      </div>
+
+      <div id="tabpanel-starred" class="tabpanel" role="tabpanel" aria-labelledby="tab-starred" hidden>
+        <div class="import-starred-segments">
+          <div class="import-starred-segments-header">
+            <label for="starred-html-input">Importar desde Mis Segmentos de Strava</label>
+            <a
+              id="open-starred-segments-btn"
+              class="secondary-btn"
+              href="https://www.strava.com/athlete/segments/starred"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Importar desde Mis Segmentos de Strava
+            </a>
+          </div>
+          <p class="hint-text">
+            Abre la página de tus segmentos favoritos en Strava, copia su código HTML (Ver código fuente de la página o
+            Guardar página como) y pégalo aquí. Repite el proceso por cada página (si hay varias) antes de confirmar.
+          </p>
+          <textarea
+            id="starred-html-input"
+            rows="4"
+            placeholder="Pega aquí el HTML de la página de segmentos favoritos de Strava"
+          ></textarea>
+          <div class="import-starred-segments-actions">
+            <button type="button" id="add-starred-html-btn" class="secondary-btn">Añadir HTML pegado</button>
+            <button type="button" id="confirm-starred-import-btn">Confirmar importación</button>
+          </div>
+          <p id="starred-import-pending-message" class="message" role="status" aria-live="polite"></p>
+        </div>
+        <p id="starred-import-message" class="message" role="alert" aria-live="polite"></p>
+      </div>
     </section>
 
     <section class="segment-list-section" aria-label="Listado de segmentos">

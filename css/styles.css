@@ -105,6 +105,41 @@ main {
   box-shadow: var(--shadow-card);
 }
 
+.tabs {
+  display: flex;
+  gap: 0.4rem;
+  border-bottom: 1px solid var(--color-border);
+  margin: -0.25rem -0.2rem 1.1rem;
+  padding: 0 0.2rem;
+}
+
+.tab-btn {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: none;
+  border-radius: 0;
+  padding: 0.7rem 0.9rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  border-bottom: 2px solid transparent;
+  transform: none;
+}
+
+.tab-btn:hover {
+  background: transparent;
+  color: var(--color-text);
+  transform: none;
+}
+
+.tab-btn.is-active {
+  color: var(--strava-orange-dark);
+  border-bottom-color: var(--strava-orange);
+}
+
+.tabpanel[hidden] {
+  display: none;
+}
+
 #add-segment-form {
   display: flex;
   gap: 0.6rem;
@@ -151,6 +186,71 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--color-text-muted);
+}
+
+.import-starred-segments {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.import-starred-segments-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.import-starred-segments-header label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.import-starred-segments .hint-text {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-muted);
+}
+
+.import-starred-segments-header a.secondary-btn {
+  padding: 0.6rem 1.1rem;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.import-starred-segments-header a.secondary-btn:hover {
+  transform: translateY(-1px);
+}
+
+.import-starred-segments textarea {
+  width: 100%;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-family: inherit;
+  background: var(--color-bg);
+  resize: vertical;
+}
+
+.import-starred-segments textarea:focus {
+  outline: none;
+  border-color: var(--strava-orange);
+  box-shadow: 0 0 0 3px rgba(252, 76, 2, 0.15);
+}
+
+.import-starred-segments-actions {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
 }
 
 button {

@@ -14,9 +14,16 @@
   var removeAllBtn = document.getElementById('remove-all-btn');
   var segmentFileInput = document.getElementById('segment-file-input');
   var importMessageEl = document.getElementById('import-message');
+  var starredHtmlInput = document.getElementById('starred-html-input');
+  var addStarredHtmlBtn = document.getElementById('add-starred-html-btn');
+  var confirmStarredImportBtn = document.getElementById('confirm-starred-import-btn');
+  var starredImportPendingMessageEl = document.getElementById('starred-import-pending-message');
+  var starredImportMessageEl = document.getElementById('starred-import-message');
+  var tabButtons = Array.prototype.slice.call(document.querySelectorAll('.tab-btn'));
 
   var segments = loadSegments();
   var loadingSegmentIds = {};
+  var pendingStarredSegments = [];
 
   function isSegmentLoading(segmentId) {
     return !!loadingSegmentIds[segmentId];
@@ -144,6 +151,33 @@
       elevationGain: Math.round(elevationGainMeters),
       averageGrade: averageGrade
     };
+  }
+
+  var SEGMENT_LINK_HREF_RE = /^(?:https:\/\/www\.strava\.com)?\/segments\/(\d+)(?:[/?#].*)?$/;
+
+  function parseStarredSegmentsHtml(htmlText) {
+    var parser = new DOMParser();
+    var doc = parser.parseFromString(htmlText || '', 'text/html');
+    var anchors = doc.querySelectorAll('a[href]');
+    var result = [];
+    var seen = {};
+
+    for (var i = 0; i < anchors.length; i += 1) {
+      var href = anchors[i].getAttribute('href') || '';
+      var match = SEGMENT_LINK_HREF_RE.exec(href.trim());
+      if (!match) {
+        continue;
+      }
+      var id = match[1];
+      if (seen[id]) {
+        continue;
+      }
+      var name = (anchors[i].textContent || '').trim();
+      seen[id] = true;
+      result.push({ id: id, name: name || null });
+    }
+
+    return result;
   }
 
   function buildSegmentDescriptionText(segment) {
@@ -437,6 +471,93 @@
     });
   }
 
+  function updatePendingStarredMessage() {
+    if (pendingStarredSegments.length === 0) {
+      setMessage(starredImportPendingMessageEl, '', null);
+      return;
+    }
+    setMessage(
+      starredImportPendingMessageEl,
+      pendingStarredSegments.length + ' segmento(s) pendiente(s) de importar.',
+      null
+    );
+  }
+
+  function addStarredHtmlToPending() {
+    setMessage(starredImportMessageEl, '', null);
+
+    var found = parseStarredSegmentsHtml(starredHtmlInput.value);
+    var addedCount = 0;
+
+    found.forEach(function (segment) {
+      var alreadyPending = pendingStarredSegments.some(function (pending) {
+        return pending.id === segment.id;
+      });
+      if (alreadyPending || findSegment(segment.id)) {
+        return;
+      }
+      pendingStarredSegments.push(segment);
+      addedCount += 1;
+    });
+
+    starredHtmlInput.value = '';
+
+    if (addedCount === 0) {
+      setMessage(starredImportMessageEl, 'No se ha encontrado ningún segmento en el HTML pegado.', 'error');
+    }
+
+    updatePendingStarredMessage();
+  }
+
+  function confirmStarredImport() {
+    setMessage(starredImportMessageEl, '', null);
+
+    if (pendingStarredSegments.length === 0) {
+      setMessage(starredImportMessageEl, 'No hay segmentos pendientes de importar.', 'error');
+      return;
+    }
+
+    var added = [];
+    var duplicateCount = 0;
+
+    pendingStarredSegments.forEach(function (pending) {
+      if (findSegment(pending.id)) {
+        duplicateCount += 1;
+        return;
+      }
+      var segment = {
+        id: pending.id,
+        name: pending.name || null,
+        distance: null,
+        elevationGain: null,
+        averageGrade: null
+      };
+      segments.push(segment);
+      added.push(segment);
+    });
+
+    if (added.length > 0) {
+      saveSegments();
+      render();
+    }
+
+    pendingStarredSegments = [];
+    updatePendingStarredMessage();
+
+    var parts = [];
+    if (added.length > 0) {
+      parts.push(added.length + ' segmento(s) importado(s).');
+    }
+    if (duplicateCount > 0) {
+      parts.push(duplicateCount + ' duplicado(s) omitido(s).');
+    }
+    setMessage(starredImportMessageEl, parts.join(' '), added.length > 0 ? 'success' : 'error');
+
+    added.forEach(function (segment) {
+      fetchSegmentName(segment.id);
+    });
+  }
+
   function triggerBlobDownload(blob, filename) {
     var url = window.URL.createObjectURL(blob);
     var link = document.createElement('a');
@@ -569,6 +690,28 @@
       setMessage(importMessageEl, 'No se pudo leer el archivo seleccionado.', 'error');
     };
     reader.readAsText(file);
+  });
+
+  addStarredHtmlBtn.addEventListener('click', addStarredHtmlToPending);
+  confirmStarredImportBtn.addEventListener('click', confirmStarredImport);
+
+  function activateTab(tabBtn) {
+    tabButtons.forEach(function (btn) {
+      var isActive = btn === tabBtn;
+      btn.classList.toggle('is-active', isActive);
+      btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+      btn.tabIndex = isActive ? 0 : -1;
+      var panel = document.getElementById(btn.getAttribute('aria-controls'));
+      if (panel) {
+        panel.hidden = !isActive;
+      }
+    });
+  }
+
+  tabButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      activateTab(btn);
+    });
   });
 
   render();
